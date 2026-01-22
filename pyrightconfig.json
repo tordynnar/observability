@@ -1,0 +1,8 @@
+{
+  "include": ["echo_server.py", "echo_client.py"],
+  "exclude": ["echo_pb2.py", "echo_pb2_grpc.py"],
+  "venvPath": ".",
+  "venv": ".venv",
+  "typeCheckingMode": "standard",
+  "reportMissingModuleSource": false
+}

@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Generated protobuf files
+echo_pb2.py
+echo_pb2_grpc.py
+echo_pb2.pyi
+echo_pb2_grpc.pyi
+
+# Playwright
+.playwright-mcp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+
+# Docker volumes (if local)
+elasticsearch-data/
