@@ -76,9 +76,18 @@ def main() -> None:
 
     with grpc.insecure_channel("localhost:50051") as channel:
         stub = echo_pb2_grpc.EchoStub(channel)
-        with tracer.start_as_current_span("echo-request", context=ctx):
+        with tracer.start_as_current_span("echo-request", context=ctx) as span:
+            # Span events are embedded in the trace and visible in Jaeger
+            span.add_event("Preparing request", {"message": "Hello, World!"})
+
             logger.info("Sending echo request")
             response = stub.Echo(echo_pb2.EchoRequest(message="Hello, World!"))
+
+            span.add_event("Response received", {
+                "response.message": response.message,
+                "response.length": len(response.message),
+            })
+
             logger.info(f"Received echo response: {response.message}")
             print(f"Response: {response.message}")
 

@@ -52,9 +52,17 @@ class EchoServicer(echo_pb2_grpc.EchoServicer):
         request: echo_pb2.EchoRequest,
         context: grpc.ServicerContext,
     ) -> echo_pb2.EchoResponse:
+        # Get the current span created by gRPC instrumentation
+        span = trace.get_current_span()
+
+        span.add_event("Request received", {"message": request.message})
         logger.info(f"Received echo request: {request.message}")
+
         response = echo_pb2.EchoResponse(message=request.message)
+
+        span.add_event("Response prepared", {"message": response.message})
         logger.info(f"Sending echo response: {response.message}")
+
         return response
 
 
