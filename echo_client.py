@@ -80,15 +80,19 @@ def main() -> None:
             # Span events are embedded in the trace and visible in Jaeger
             span.add_event("Preparing request", {"message": "Hello, World!"})
 
-            logger.info("Sending echo request")
-            response = stub.Echo(echo_pb2.EchoRequest(message="Hello, World!"))
+            message = "Hello, World!"
+            logger.info("Sending echo request", extra={"request.message": message})
+            response = stub.Echo(echo_pb2.EchoRequest(message=message))
 
             span.add_event("Response received", {
                 "response.message": response.message,
                 "response.length": len(response.message),
             })
 
-            logger.info(f"Received echo response: {response.message}")
+            logger.info("Received echo response", extra={
+                "response.message": response.message,
+                "response.length": len(response.message),
+            })
             print(f"Response: {response.message}")
 
 
