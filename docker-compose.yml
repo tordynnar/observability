@@ -1,6 +1,6 @@
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:0.144.0
     container_name: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
@@ -14,24 +14,21 @@ services:
         condition: service_healthy
 
   jaeger:
-    image: jaegertracing/all-in-one:latest
+    image: jaegertracing/jaeger:2.14.1
     container_name: jaeger
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - QUERY_UI_CONFIG=/etc/jaeger/jaeger-ui-config.json
-      - SPAN_STORAGE_TYPE=elasticsearch
-      - ES_SERVER_URLS=http://elasticsearch:9200
+    command: ["--config", "/etc/jaeger/config.yaml"]
     volumes:
+      - ./jaeger-config.yaml:/etc/jaeger/config.yaml:ro
       - ./jaeger-ui-config.json:/etc/jaeger/jaeger-ui-config.json:ro
     ports:
       - "16686:16686" # Jaeger UI
-      - "14268:14268" # Jaeger HTTP collector
+      - "4317"        # OTLP gRPC (internal, used by otel-collector)
     depends_on:
       elasticsearch:
         condition: service_healthy
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.4
     container_name: elasticsearch
     environment:
       - discovery.type=single-node
@@ -48,7 +45,7 @@ services:
       retries: 10
 
   kibana:
-    image: docker.elastic.co/kibana/kibana:8.17.0
+    image: docker.elastic.co/kibana/kibana:9.2.4
     container_name: kibana
     environment:
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
