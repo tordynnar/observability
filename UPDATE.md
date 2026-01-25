@@ -198,6 +198,51 @@ exporters:
     trace_storage: es_main
 ```
 
+### jaeger-ui-config.json
+
+Jaeger UI configuration for custom link patterns. This enables the "View Logs in Kibana" link on trace pages.
+
+```json
+{
+  "linkPatterns": [
+    {
+      "type": "traces",
+      "url": "http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"#{traceID}\"'))",
+      "text": "View Logs in Kibana"
+    }
+  ]
+}
+```
+
+#### Jaeger Link Pattern Template Variables
+
+Link patterns use `#{variable}` syntax for dynamic substitution. Available variables depend on the link type:
+
+**For `traces` type** (links shown at trace level):
+- `#{traceID}` - The trace ID
+- `#{traceName}` - The trace name (root span operation)
+- `#{startTime}` - Trace start time in microseconds
+- `#{endTime}` - Trace end time in microseconds
+- `#{duration}` - Trace duration in microseconds
+
+**For `logs`, `tags`, `process` types** (links shown at span level):
+- Trace variables require `trace.` prefix: `#{trace.traceID}`, `#{trace.startTime}`, etc.
+- Can also reference the matched key's value
+
+**Not available:**
+- `#{spanID}` is **not currently supported** in any link pattern type
+- This limitation is tracked in [GitHub Issue #578](https://github.com/jaegertracing/jaeger-ui/issues/578)
+
+#### Deep Linking to Specific Spans
+
+While link patterns don't support `spanID`, you can deep link to specific spans via URL parameters:
+
+```
+http://localhost:16686/trace/{traceId}?uiFind={spanId}
+```
+
+The `uiFind` parameter highlights and scrolls to the specified span. Multiple spans can be specified with multiple `uiFind` parameters.
+
 ## Upgrade Instructions
 
 1. Stop and remove existing containers and volumes:
