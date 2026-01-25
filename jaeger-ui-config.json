@@ -2,7 +2,7 @@
   "linkPatterns": [
     {
       "type": "traces",
-      "url": "http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-1h,to:now))&_a=(columns:!(message,log.level),filters:!(),query:(language:kuery,query:'trace.id:\"#{traceID}\"'))",
+      "url": "http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"#{traceID}\"'))",
       "text": "View Logs in Kibana"
     }
   ]
