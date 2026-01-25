@@ -72,7 +72,7 @@ def main() -> None:
     trace_uuid, ctx = new_trace_context()
     trace_id = trace_uuid.hex
     print(f"Jaeger: http://localhost:16686/trace/{trace_id}")
-    print(f"Kibana: http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-1h,to:now))&_a=(columns:!(message,log.level),filters:!(),query:(language:kuery,query:'trace.id:\"{trace_id}\"'))")
+    print(f"Kibana: http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"{trace_id}\"'))")
 
     with grpc.insecure_channel("localhost:50051") as channel:
         stub = echo_pb2_grpc.EchoStub(channel)
