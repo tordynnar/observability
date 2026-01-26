@@ -109,6 +109,41 @@ class EchoServicer(echo_pb2_grpc.EchoServicer):
 
 4. **Servers must explicitly check for cancellation** - Use `context.is_active()` in loops to stop processing when the client disconnects.
 
+5. **Cancellation happens immediately, not at script exit** - The `__del__()` destructor is called as soon as `close()` drops the reference, not when the Python script terminates.
+
+## Timing Verification
+
+To confirm that cancellation happens immediately (not at script exit), we can add timestamps and a delay after `close()`:
+
+```python
+print(f"[{timestamp()}] CLIENT: Calling close()")
+responses.close()
+print(f"[{timestamp()}] CLIENT: close() returned")
+print(f"[{timestamp()}] CLIENT: Sleeping 3 seconds...")
+time.sleep(3)
+print(f"[{timestamp()}] CLIENT: Done sleeping, exiting")
+```
+
+Output with timestamps:
+
+```
+[11:50:42] CLIENT: Calling close()
+[11:50:42] CLIENT: close() returned
+[11:50:42] CLIENT: Sleeping 3 seconds...
+[11:50:43] SERVER: Client cancelled, stopping   ← Server stops here
+[11:50:45] CLIENT: Done sleeping, exiting       ← Script exits 2 seconds later
+```
+
+The server detects cancellation at **11:50:43** (after its 1-second sleep completes), while the client script doesn't exit until **11:50:45**. This proves that `__del__()` is triggered immediately when `close()` drops the reference to `_MultiThreadedRendezvous`, not when the script terminates.
+
+## Raw gRPC vs OpenTelemetry Instrumented
+
+| Aspect | Raw gRPC | With OpenTelemetry |
+|--------|----------|-------------------|
+| Response type | `_MultiThreadedRendezvous` | `generator` |
+| Cancel method | `responses.cancel()` | `responses.close()` |
+| Mechanism | Direct cancel call | GC triggers `__del__()` |
+
 ## Comparison: With vs Without Cancellation Check
 
 ### Without check (server keeps running):
