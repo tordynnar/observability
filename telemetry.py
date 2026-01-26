@@ -7,6 +7,8 @@ import uuid
 
 from opentelemetry import trace
 from opentelemetry._logs import set_logger_provider
+from opentelemetry.propagate import set_global_textmap
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient, GrpcInstrumentorServer
@@ -64,6 +66,9 @@ def setup_telemetry(service_name: str) -> SettableIdGenerator:
     trace_exporter = OTLPSpanExporter(endpoint="localhost:4317", insecure=True)
     trace_provider.add_span_processor(SimpleSpanProcessor(trace_exporter))
     trace.set_tracer_provider(trace_provider)
+
+    # Set up W3C TraceContext propagator explicitly
+    set_global_textmap(TraceContextTextMapPropagator())
 
     # Instrument both gRPC client and server
     GrpcInstrumentorClient().instrument()

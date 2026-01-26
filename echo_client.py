@@ -25,24 +25,40 @@ def do_echo(
 
     print(f"\n--- Echo: {message} ---")
     print(f"Jaeger: http://localhost:16686/trace/{trace_id}")
-    print(f"Kibana: http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"{trace_id}\"'))")
+    print(
+        f"Kibana: http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"{trace_id}\"'))"
+    )
 
     with tracer.start_as_current_span("echo-request") as span:
         span.add_event("Preparing request", {"message": message})
 
         logger.info("Sending echo request", extra={"request.message": message})
-        response = stub.Echo(echo_pb2.EchoRequest(message=message))
+        responses = stub.Echo(echo_pb2.EchoRequest(message=message))
 
-        span.add_event("Response received", {
-            "response.message": response.message,
-            "response.length": len(response.message),
-        })
+        for i, response in enumerate(responses, 1):
+            span.add_event(
+                "Response received",
+                {
+                    "copy": i,
+                    "response.message": response.message,
+                    "response.length": len(response.message),
+                },
+            )
 
-        logger.info("Received echo response", extra={
-            "response.message": response.message,
-            "response.length": len(response.message),
-        })
-        print(f"Response: {response.message}")
+            logger.info(
+                "Received echo response",
+                extra={
+                    "copy": i,
+                    "response.message": response.message,
+                    "response.length": len(response.message),
+                },
+            )
+            print(f"Response {i}: {response.message}")
+
+            # Cancel after receiving the first response
+            responses.close()
+            span.add_event("Cancelled after first response")
+            break
 
 
 def main() -> None:
