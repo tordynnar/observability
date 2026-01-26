@@ -7,21 +7,18 @@ from opentelemetry import trace
 
 import echo_pb2
 import echo_pb2_grpc
-from telemetry import SettableIdGenerator, setup_telemetry
-
-logger = logging.getLogger(__name__)
+from telemetry import ServiceTelemetry, create_service_telemetry, setup_global_telemetry
 
 
 def do_echo(
     stub: echo_pb2_grpc.EchoStub,
-    tracer: trace.Tracer,
-    id_generator: SettableIdGenerator,
+    service: ServiceTelemetry,
     message: str,
 ) -> None:
     """Make an Echo RPC call with its own trace ID."""
     trace_uuid = uuid.uuid4()
     trace_id = trace_uuid.hex
-    id_generator.set_next_trace_id(trace_uuid)
+    service.id_generator.set_next_trace_id(trace_uuid)
 
     print(f"\n--- Echo: {message} ---")
     print(f"Jaeger: http://localhost:16686/trace/{trace_id}")
@@ -29,10 +26,10 @@ def do_echo(
         f"Kibana: http://localhost:5601/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:now-15m,to:now))&_a=(columns:!(message,log.level,service.name),filters:!(),query:(language:kuery,query:'trace.id:\"{trace_id}\"'))"
     )
 
-    with tracer.start_as_current_span("echo-request") as span:
+    with service.tracer.start_as_current_span("echo-request") as span:
         span.add_event("Preparing request", {"message": message})
 
-        logger.info("Sending echo request", extra={"request.message": message})
+        service.logger.info("Sending echo request", extra={"request.message": message})
         responses = stub.Echo(echo_pb2.EchoRequest(message=message))
 
         for i, response in enumerate(responses, 1):
@@ -45,7 +42,7 @@ def do_echo(
                 },
             )
 
-            logger.info(
+            service.logger.info(
                 "Received echo response",
                 extra={
                     "copy": i,
@@ -62,15 +59,19 @@ def do_echo(
 
 
 def main() -> None:
-    id_generator = setup_telemetry("echo-client")
-    tracer = trace.get_tracer(__name__)
+    # Set up global telemetry infrastructure first
+    setup_global_telemetry()
+
+    # Create two services with different names
+    service1 = create_service_telemetry("echo-client-1")
+    service2 = create_service_telemetry("echo-client-2")
 
     with grpc.insecure_channel("localhost:50051") as channel:
         stub = echo_pb2_grpc.EchoStub(channel)
 
-        # Two separate Echo calls, each with their own trace ID
-        do_echo(stub, tracer, id_generator, "Hello, World!")
-        do_echo(stub, tracer, id_generator, "Goodbye, World!")
+        # Two separate Echo calls, each from a different service
+        do_echo(stub, service1, "Hello, World!")
+        do_echo(stub, service2, "Goodbye, World!")
 
 
 if __name__ == "__main__":

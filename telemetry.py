@@ -4,6 +4,7 @@
 import logging
 import random
 import uuid
+from dataclasses import dataclass
 
 from opentelemetry import trace
 from opentelemetry._logs import set_logger_provider
@@ -41,8 +42,79 @@ class SettableIdGenerator(IdGenerator):
         return random.getrandbits(64)
 
 
+@dataclass
+class ServiceTelemetry:
+    """Container for service-specific telemetry components."""
+
+    tracer: trace.Tracer
+    logger: logging.Logger
+    id_generator: SettableIdGenerator
+
+
+def create_service_telemetry(service_name: str) -> ServiceTelemetry:
+    """Create telemetry components for a specific service.
+
+    This allows multiple services to coexist in the same process, each with
+    their own tracer and logger that report the correct service name.
+
+    Args:
+        service_name: The name of the service for resource identification.
+
+    Returns:
+        ServiceTelemetry containing the tracer, logger, and ID generator.
+    """
+    resource = Resource.create({"service.name": service_name})
+
+    # Use SimpleSpanProcessor/SimpleLogRecordProcessor to export telemetry immediately.
+    # BatchSpanProcessor is more efficient but buffers data, which can be lost if the
+    # process exits before the buffer is flushed. For short-lived processes or demos,
+    # SimpleSpanProcessor ensures all telemetry is exported before the process exits.
+
+    # Tracing - use settable ID generator to control trace IDs for root spans
+    id_generator = SettableIdGenerator()
+    trace_provider = TracerProvider(
+        resource=resource,
+        id_generator=id_generator,
+    )
+    trace_exporter = OTLPSpanExporter(endpoint="localhost:4317", insecure=True)
+    trace_provider.add_span_processor(SimpleSpanProcessor(trace_exporter))
+
+    # Get a tracer from this specific provider (not the global one)
+    tracer = trace_provider.get_tracer(service_name)
+
+    # Logging - create a service-specific logger
+    log_provider = LoggerProvider(resource=resource)
+    log_exporter = OTLPLogExporter(endpoint="localhost:4317", insecure=True)
+    log_provider.add_log_record_processor(SimpleLogRecordProcessor(log_exporter))
+
+    # Create a dedicated logger for this service
+    logger = logging.getLogger(service_name)
+    logger.setLevel(logging.INFO)
+    handler = LoggingHandler(level=logging.INFO, logger_provider=log_provider)
+    logger.addHandler(handler)
+
+    return ServiceTelemetry(tracer=tracer, logger=logger, id_generator=id_generator)
+
+
+def setup_global_telemetry() -> None:
+    """Set up global telemetry infrastructure (propagation, gRPC instrumentation).
+
+    Call this once at process startup before creating service-specific telemetry.
+    """
+    # Set up W3C TraceContext propagator explicitly
+    set_global_textmap(TraceContextTextMapPropagator())
+
+    # Instrument gRPC - these work with context propagation
+    GrpcInstrumentorClient().instrument()
+    GrpcInstrumentorServer().instrument()
+
+
 def setup_telemetry(service_name: str) -> SettableIdGenerator:
-    """Set up OpenTelemetry tracing and logging.
+    """Set up OpenTelemetry tracing and logging for a single-service process.
+
+    This is the simple API for processes that only have one service identity.
+    For multi-service processes, use setup_global_telemetry() and
+    create_service_telemetry() instead.
 
     Args:
         service_name: The name of the service for resource identification.
